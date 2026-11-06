@@ -186,3 +186,99 @@ import { createSpaceScene } from './space-scene.js?v=galaxy-7';
     if (event.key === 'Escape' && !panel.hidden) { setOpen(false); button.focus(); }
   });
 })();
+
+// Gently warp the existing eye pixels, preserving the photo and eyelid edges.
+(() => {
+  const hero = document.querySelector('.hero');
+  const surface = hero?.querySelector('.gaze-surface');
+  const photo = surface?.querySelector('.gaze-source');
+  if (!photo) return;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const pointer = matchMedia('(any-pointer: fine)');
+  const canvas = document.createElement('canvas');
+  canvas.className = 'gaze-canvas';
+  canvas.setAttribute('aria-hidden', 'true');
+  canvas.hidden = true;
+  surface.append(canvas);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  let patches = [], frame = 0, active = false, ready = false;
+  let targetX = 0, targetY = 0, gazeX = 0, gazeY = 0;
+  const enabled = () => ready && active && pointer.matches && !reduced.matches && !document.hidden && !hero.classList.contains('motion-paused');
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  function prepare() {
+    try {
+      canvas.width = photo.naturalWidth;
+      canvas.height = photo.naturalHeight;
+      const sample = document.createElement('canvas');
+      sample.width = canvas.width; sample.height = canvas.height;
+      const source = sample.getContext('2d', {willReadFrequently: true});
+      source.drawImage(photo, 0, 0);
+      // Coordinates belong to the retained 1024 × 1536 portrait.
+      patches = [{x:469, y:188}, {x:548, y:187}].map(eye => {
+        const left = eye.x - 28, top = eye.y - 14, w = 56, h = 28;
+        return {left, top, w, h, pixels:source.getImageData(left, top, w, h), output:ctx.createImageData(w, h)};
+      });
+      ready = true;
+    } catch { canvas.remove(); }
+  }
+  function paint() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const patch of patches) {
+      const {w,h,pixels,output} = patch;
+      for (let y=0; y<h; y++) for (let x=0; x<w; x++) {
+        const dx=(x-28)/23, dy=(y-14)/8.5;
+        const radius=Math.sqrt(dx*dx+dy*dy);
+        const falloff=clamp((1-radius)/.65, 0, 1);
+        const weight=falloff*falloff*(3-2*falloff);
+        const sx=clamp(x-gazeX*4.5*weight, 0, w-1);
+        const sy=clamp(y-gazeY*2*weight, 0, h-1);
+        const x0=Math.floor(sx), y0=Math.floor(sy), x1=Math.min(x0+1,w-1), y1=Math.min(y0+1,h-1);
+        const fx=sx-x0, fy=sy-y0, dest=(y*w+x)*4;
+        for (let channel=0; channel<4; channel++) {
+          const a=pixels.data[(y0*w+x0)*4+channel]*(1-fx)+pixels.data[(y0*w+x1)*4+channel]*fx;
+          const b=pixels.data[(y1*w+x0)*4+channel]*(1-fx)+pixels.data[(y1*w+x1)*4+channel]*fx;
+          output.data[dest+channel]=a*(1-fy)+b*fy;
+        }
+      }
+      ctx.putImageData(output,patch.left,patch.top);
+    }
+  }
+  function render() {
+    frame=0;
+    if (!enabled()) return reset();
+    gazeX+=(targetX-gazeX)*.18;
+    gazeY+=(targetY-gazeY)*.18;
+    canvas.hidden=false;
+    paint();
+    if (Math.abs(targetX-gazeX)+Math.abs(targetY-gazeY)>.002) frame=requestAnimationFrame(render);
+  }
+  function reset() {
+    cancelAnimationFrame(frame); frame=0;
+    targetX=targetY=gazeX=gazeY=0;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    canvas.hidden=true;
+  }
+  document.addEventListener('pointermove', event => {
+    if (event.pointerType==='touch' || !enabled()) return;
+    const bounds=surface.getBoundingClientRect();
+    const scale=Math.min(bounds.width/canvas.width,bounds.height/canvas.height);
+    const eyeX=bounds.left+bounds.width/2;
+    const eyeY=bounds.top+188*scale;
+    // Elliptical limit keeps both eyes looking in the same direction.
+    let x=(event.clientX-eyeX)/Math.max(innerWidth*.32,180);
+    let y=(event.clientY-eyeY)/Math.max(innerHeight*.4,180);
+    const length=Math.max(1,Math.hypot(x,y));
+    targetX=x/length; targetY=y/length;
+    if (!frame) frame=requestAnimationFrame(render);
+  }, {passive:true});
+  document.documentElement.addEventListener('pointerleave',reset);
+  window.addEventListener('blur',reset);
+  document.addEventListener('visibilitychange',reset);
+  reduced.addEventListener('change',reset);
+  pointer.addEventListener('change',reset);
+  new MutationObserver(() => { if (hero.classList.contains('motion-paused')) reset(); }).observe(hero,{attributes:true,attributeFilter:['class']});
+  new IntersectionObserver(entries => { active=entries[0].isIntersecting; if (!active) reset(); }).observe(surface);
+  if (photo.complete && photo.naturalWidth) prepare();
+  else photo.addEventListener('load',prepare,{once:true});
+})();
