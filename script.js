@@ -282,3 +282,31 @@ import { createSpaceScene } from './space-scene.js?v=galaxy-7';
   if (photo.complete && photo.naturalWidth) prepare();
   else photo.addEventListener('load',prepare,{once:true});
 })();
+
+// Show the user's silent clip only while the first page is in view.
+(() => {
+  const hero=document.querySelector('.hero');
+  const widget=document.querySelector('.site-music');
+  const card=widget?.querySelector('.hero-mini-clip');
+  const video=card?.querySelector('video');
+  const button=card?.querySelector('.clip-toggle');
+  if (!hero || !video || !button) return;
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let visible=false, userPaused=false;
+  function sync() {
+    card.hidden=!visible;
+    const paused=userPaused || reduced.matches || document.hidden || !visible || hero.classList.contains('motion-paused') || widget.classList.contains('music-active');
+    button.setAttribute('aria-label',paused?'Play small animation':'Pause small animation');
+    button.setAttribute('aria-pressed',String(paused));
+    button.querySelector('span').textContent=paused?'▷':'Ⅱ';
+    if (paused) video.pause();
+    else video.play()?.catch(() => {});
+  }
+  button.addEventListener('click',() => {userPaused=!userPaused;sync();});
+  new IntersectionObserver(entries => {visible=entries[0].isIntersecting && entries[0].intersectionRatio>.1;sync();},{threshold:[0,.1]}).observe(hero);
+  new MutationObserver(sync).observe(hero,{attributes:true,attributeFilter:['class']});
+  new MutationObserver(sync).observe(widget,{attributes:true,attributeFilter:['class']});
+  document.addEventListener('visibilitychange',sync);
+  reduced.addEventListener('change',sync);
+  sync();
+})();
