@@ -158,33 +158,42 @@ import { createSpaceScene } from './space-scene.js?v=galaxy-7';
   });
 })();
 
-// Load the user's YouTube soundtrack only after an explicit play action.
+// Play the user's local soundtrack, with a gesture fallback for browser autoplay rules.
 (() => {
-  const widget = document.querySelector('.site-music');
-  if (!widget) return;
-  const button = widget.querySelector('.music-toggle');
-  const panel = widget.querySelector('.music-panel');
-  const frame = widget.querySelector('.music-frame');
-  const close = widget.querySelector('.music-close');
-  const status = widget.querySelector('.music-status');
-  function setOpen(open) {
-    panel.hidden = !open;
-    button.setAttribute('aria-expanded', String(open));
-    button.querySelector('span').textContent = open ? 'STOP MUSIC' : 'PLAY MUSIC';
-    widget.classList.toggle('music-active', open);
-    if (open) {
-      frame.src = 'https://www.youtube-nocookie.com/embed/q_BCyHd0vhA?autoplay=1&loop=1&playlist=q_BCyHd0vhA&playsinline=1&rel=0';
-      status.textContent = 'Music player opened. Use the YouTube controls to play or pause.';
-    } else {
-      frame.removeAttribute('src');
-      status.textContent = 'Music stopped.';
-    }
+  const widget=document.querySelector('.site-music');
+  const audio=widget?.querySelector('.background-audio');
+  const button=widget?.querySelector('.music-toggle');
+  const status=widget?.querySelector('.music-status');
+  if (!audio || !button || !status) return;
+  let wantsPlayback=true;
+  audio.volume=.3;
+  function sync() {
+    const playing=!audio.paused && !audio.ended;
+    widget.classList.toggle('music-active',playing);
+    button.setAttribute('aria-pressed',String(playing));
+    button.setAttribute('aria-label',playing?'Pause background music':'Play background music');
+    button.querySelector('span').textContent=playing?'PAUSE MUSIC':'PLAY MUSIC';
   }
-  button.addEventListener('click', () => setOpen(panel.hidden));
-  close.addEventListener('click', () => { setOpen(false); button.focus(); });
-  widget.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !panel.hidden) { setOpen(false); button.focus(); }
+  async function start() {
+    try {await audio.play();}
+    catch {status.textContent='Tap Play Music to start background music.';sync();}
+  }
+  button.addEventListener('click',() => {
+    if (audio.paused) {wantsPlayback=true;start();}
+    else {wantsPlayback=false;audio.pause();}
   });
+  function firstGesture(event) {
+    if (event.target.closest?.('.music-toggle') || !wantsPlayback || !audio.paused) return;
+    if (event.type==='keydown' && (event.metaKey || event.ctrlKey || event.altKey || ['Shift','Control','Alt','Meta','Escape'].includes(event.key))) return;
+    start();
+  }
+  document.addEventListener('pointerdown',firstGesture,{passive:true});
+  document.addEventListener('keydown',firstGesture);
+  audio.addEventListener('playing',() => {status.textContent='Background music playing.';sync();});
+  audio.addEventListener('pause',() => {status.textContent='Background music paused.';sync();});
+  audio.addEventListener('error',() => {status.textContent='Music could not load. Please try again.';sync();});
+  sync();
+  start();
 })();
 
 // Gently warp the existing eye pixels, preserving the photo and eyelid edges.
