@@ -157,3 +157,32 @@ import { createSpaceScene } from './space-scene.js?v=galaxy-7';
     }, 4000);
   });
 })();
+
+// Load the user's YouTube soundtrack only after an explicit play action.
+(() => {
+  const widget = document.querySelector('.site-music');
+  if (!widget) return;
+  const button = widget.querySelector('.music-toggle');
+  const panel = widget.querySelector('.music-panel');
+  const frame = widget.querySelector('.music-frame');
+  const close = widget.querySelector('.music-close');
+  const status = widget.querySelector('.music-status');
+  function setOpen(open) {
+    panel.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+    button.querySelector('span').textContent = open ? 'STOP MUSIC' : 'PLAY MUSIC';
+    widget.classList.toggle('music-active', open);
+    if (open) {
+      frame.src = 'https://www.youtube-nocookie.com/embed/q_BCyHd0vhA?autoplay=1&loop=1&playlist=q_BCyHd0vhA&playsinline=1&rel=0';
+      status.textContent = 'Music player opened. Use the YouTube controls to play or pause.';
+    } else {
+      frame.removeAttribute('src');
+      status.textContent = 'Music stopped.';
+    }
+  }
+  button.addEventListener('click', () => setOpen(panel.hidden));
+  close.addEventListener('click', () => { setOpen(false); button.focus(); });
+  widget.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !panel.hidden) { setOpen(false); button.focus(); }
+  });
+})();
