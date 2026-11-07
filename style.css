@@ -146,7 +146,8 @@ body{background:#020308}.site-header{background:#03050b}
 .gaze-surface{position:relative}.gaze-source,.gaze-canvas{display:block;width:100%;height:100%;object-fit:contain;object-position:top center}.gaze-canvas{position:absolute;inset:0;pointer-events:none}.gaze-canvas[hidden]{display:none}
 
 /* Small blended animation above the bottom-right scroll prompt. */
-.hero .hero-corner-animation{inset:auto 48px 76px auto;width:230px;height:auto;aspect-ratio:16/9;z-index:0;opacity:.86;transform:none;mask-image:radial-gradient(ellipse 74% 84% at 50% 50%,#000 56%,transparent 100%);mix-blend-mode:screen;pointer-events:none}.hero .hero-corner-animation video{object-fit:contain;object-position:center;transform:none;filter:contrast(1.12) saturate(.9)}
+.hero .hero-corner-animation{inset:auto 48px 76px auto;width:230px;height:auto;aspect-ratio:16/9;z-index:0;opacity:.86;transform:none;mask-image:radial-gradient(ellipse 74% 84% at 50% 50%,#000 56%,transparent 100%);mix-blend-mode:screen;pointer-events:none}/* Crush the supplied clip’s gray floor to black; screen blending reveals the galaxy beneath. */
+.hero .hero-corner-animation video{object-fit:contain;object-position:center;transform:none;filter:contrast(2) brightness(.95) saturate(.8)}
 @media(max-width:1000px){.hero .hero-corner-animation{right:28px;bottom:74px;width:190px}}
 @media(max-width:650px){.hero .hero-corner-animation{right:18px;bottom:78px;width:160px}}
 
